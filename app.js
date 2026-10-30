@@ -5,6 +5,7 @@
   const CHUNK = 8;                       // bir derste kaç kelime
   const HEARTS = 5;
   const KEY = "yds-kelime-v1";
+  const OPEN_KEY = "yds-kelime-open";      // akordiyonda açık üniteler
 
   const SETS = window.WORD_SETS;
   const WORDS = [];                      // düz liste
@@ -96,10 +97,28 @@
     top.innerHTML = `<div class="row"><div class="grow"><b>Genel ilerleme</b><div class="muted">${done}/${total} ders · ${learned}/${WORDS.length} kelime öğrenildi</div></div><div style="font-size:30px">🏆</div></div><div class="bar" style="margin-top:10px"><i style="width:${(done / total) * 100}%"></i></div>`;
     app.appendChild(top);
 
+    // akordiyon: hangi üniteler açık? (kayıt yoksa: bitmemiş ilk ünite açık)
+    let openSet = null;
+    try { openSet = JSON.parse(localStorage.getItem(OPEN_KEY)); } catch (e) {}
+    if (!Array.isArray(openSet)) {
+      const cur = SETS.find((s) => s.lessons.some((l) => !lessonDone(l.id))) || SETS[0];
+      openSet = cur ? [cur.id] : [];
+    }
+    const saveOpen = () => { try { localStorage.setItem(OPEN_KEY, JSON.stringify(openSet)); } catch (e) {} };
+
     SETS.forEach((s) => {
-      const u = el("div", "unit");
+      const isOpen = openSet.includes(s.id);
+      const u = el("div", "unit" + (isOpen ? " open" : ""));
       const d = s.lessons.filter((l) => lessonDone(l.id)).length;
-      u.appendChild(el("div", "unit-head " + (s.kind === "prep" ? "prep" : ""), `<div><b>${esc(s.title)}</b><br><small>${s.items.length} ${s.kind === "prep" ? "kalıp" : "kelime"}</small></div><small>${d}/${s.lessons.length}</small>`));
+      const head = el("button", "unit-head " + (s.kind === "prep" ? "prep" : "") + (d === s.lessons.length ? " complete" : ""), `<div><b>${esc(s.title)}</b><br><small>${s.items.length} ${s.kind === "prep" ? "kalıp" : "kelime"}</small></div><div class="uh-r"><small>${d}/${s.lessons.length}</small><span class="chev">▾</span></div>`);
+      head.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      head.addEventListener("click", () => {
+        const open = u.classList.toggle("open");
+        head.setAttribute("aria-expanded", open ? "true" : "false");
+        openSet = openSet.filter((x) => x !== s.id); if (open) openSet.push(s.id);
+        saveOpen();
+      });
+      u.appendChild(head);
       const nodes = el("div", "nodes");
       s.lessons.forEach((l, i) => {
         const b = el("button", "node" + (lessonDone(l.id) ? " done" : ""), lessonDone(l.id) ? "★" : i + 1);
